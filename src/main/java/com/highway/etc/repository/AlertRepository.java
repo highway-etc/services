@@ -1,6 +1,6 @@
 package com.highway.etc.repository;
 
-import com.highway.etc.model.AlertRecord;
+import com.highway.etc.api.dto.AlertResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -18,8 +18,8 @@ public class AlertRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public List<AlertRecord> query(String plateMask, String start, String end) {
-        StringBuilder sql = new StringBuilder("SELECT alert_id,hphm_mask,first_station_id,second_station_id,time_gap_sec,distance_km,speed_kmh,confidence,created_at FROM alert_plate_clone WHERE 1=1");
+    public List<AlertResponse> query(String plateMask, String start, String end) {
+        StringBuilder sql = new StringBuilder("SELECT hphm_mask,first_station_id,created_at FROM alert_plate_clone WHERE 1=1");
         java.util.List<Object> params = new java.util.ArrayList<>();
         if (plateMask != null && !plateMask.isBlank()) {
             sql.append(" AND hphm_mask LIKE ?");
@@ -37,19 +37,14 @@ public class AlertRepository {
         return jdbcTemplate.query(sql.toString(), params.toArray(), mapper);
     }
 
-    private final RowMapper<AlertRecord> mapper = new RowMapper<>() {
+    private final RowMapper<AlertResponse> mapper = new RowMapper<>() {
         @Override
-        public AlertRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
-            AlertRecord a = new AlertRecord();
-            a.setAlertId(rs.getLong("alert_id"));
-            a.setHphmMask(rs.getString("hphm_mask"));
-            a.setFirstStationId((Integer) rs.getObject("first_station_id"));
-            a.setSecondStationId((Integer) rs.getObject("second_station_id"));
-            a.setTimeGapSec(rs.getLong("time_gap_sec"));
-            a.setDistanceKm((Double) rs.getObject("distance_km"));
-            a.setSpeedKmh((Double) rs.getObject("speed_kmh"));
-            a.setConfidence((Double) rs.getObject("confidence"));
-            a.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+        public AlertResponse mapRow(ResultSet rs, int rowNum) throws SQLException {
+            AlertResponse a = new AlertResponse();
+            a.setStationId((Integer) rs.getObject("first_station_id"));
+            a.setLicensePlate(rs.getString("hphm_mask"));
+            a.setTimestamp(rs.getTimestamp("created_at").toLocalDateTime());
+            a.setAlertType("Plate Clone");
             return a;
         }
     };

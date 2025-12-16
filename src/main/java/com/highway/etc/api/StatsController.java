@@ -1,6 +1,6 @@
 package com.highway.etc.api;
 
-import com.highway.etc.model.StatsRecord;
+import com.highway.etc.api.dto.StatsResponse;
 import com.highway.etc.repository.StatsRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,7 +18,7 @@ public class StatsController {
     }
 
     @GetMapping("/api/stats")
-    public List<StatsRecord> stats(
+    public List<StatsResponse> stats(
             @RequestParam(required = false) Integer stationId,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end

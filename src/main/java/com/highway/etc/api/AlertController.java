@@ -1,6 +1,6 @@
 package com.highway.etc.api;
 
-import com.highway.etc.model.AlertRecord;
+import com.highway.etc.api.dto.AlertResponse;
 import com.highway.etc.repository.AlertRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,7 +18,7 @@ public class AlertController {
     }
 
     @GetMapping("/api/alerts")
-    public List<AlertRecord> alerts(
+    public List<AlertResponse> alerts(
             @RequestParam(required = false) String plate,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end

@@ -1,12 +1,10 @@
 package com.highway.etc.api;
 
-import com.highway.etc.model.TrafficRecord;
+import com.highway.etc.api.dto.TrafficPageResponse;
 import com.highway.etc.repository.TrafficRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 public class TrafficController {
@@ -18,7 +16,7 @@ public class TrafficController {
     }
 
     @GetMapping("/api/traffic")
-    public List<TrafficRecord> traffic(
+    public TrafficPageResponse traffic(
             @RequestParam(required = false) Integer stationId,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,

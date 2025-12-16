@@ -1,6 +1,7 @@
 package com.highway.etc.repository;
 
-import com.highway.etc.model.TrafficRecord;
+import com.highway.etc.api.dto.TrafficPageResponse;
+import com.highway.etc.api.dto.TrafficResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -18,43 +19,47 @@ public class TrafficRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public List<TrafficRecord> query(Integer stationId, String start, String end, int page, int size) {
+    public TrafficPageResponse query(Integer stationId, String start, String end, int page, int size) {
         int safeSize = Math.max(size, 1);
         int offset = Math.max(page - 1, 0) * safeSize;
-        StringBuilder sql = new StringBuilder("SELECT id,gcsj,xzqhmc,adcode,kkmc,station_id,fxlx,hpzl,hphm_mask,clppxh FROM traffic_pass_dev WHERE 1=1");
+        StringBuilder base = new StringBuilder(" FROM traffic_pass_dev WHERE 1=1");
         java.util.List<Object> params = new java.util.ArrayList<>();
         if (stationId != null) {
-            sql.append(" AND station_id = ?");
+            base.append(" AND station_id = ?");
             params.add(stationId);
         }
         if (start != null && !start.isBlank()) {
-            sql.append(" AND gcsj >= ?");
+            base.append(" AND gcsj >= ?");
             params.add(start);
         }
         if (end != null && !end.isBlank()) {
-            sql.append(" AND gcsj <= ?");
+            base.append(" AND gcsj <= ?");
             params.add(end);
         }
-        sql.append(" ORDER BY gcsj DESC LIMIT ? OFFSET ?");
+
+        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*)" + base, params.toArray(), Long.class);
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT gcsj AS timestamp,hphm_mask AS license_plate,station_id,NULL AS speed" + base
+                + " ORDER BY gcsj DESC LIMIT ? OFFSET ?");
         params.add(safeSize);
         params.add(offset);
-        return jdbcTemplate.query(sql.toString(), params.toArray(), mapper);
+        List<TrafficResponse> records = jdbcTemplate.query(sql.toString(), params.toArray(), mapper);
+
+        TrafficPageResponse resp = new TrafficPageResponse();
+        resp.setTotal(total == null ? 0 : total);
+        resp.setRecords(records);
+        return resp;
     }
 
-    private final RowMapper<TrafficRecord> mapper = new RowMapper<>() {
+    private final RowMapper<TrafficResponse> mapper = new RowMapper<>() {
         @Override
-        public TrafficRecord mapRow(ResultSet rs, int rowNum) throws SQLException {
-            TrafficRecord t = new TrafficRecord();
-            t.setId(rs.getLong("id"));
-            t.setGcsj(rs.getTimestamp("gcsj").toLocalDateTime());
-            t.setXzqhmc(rs.getString("xzqhmc"));
-            t.setAdcode((Integer) rs.getObject("adcode"));
-            t.setKkmc(rs.getString("kkmc"));
+        public TrafficResponse mapRow(ResultSet rs, int rowNum) throws SQLException {
+            TrafficResponse t = new TrafficResponse();
+            t.setTimestamp(rs.getTimestamp("timestamp").toLocalDateTime());
+            t.setLicensePlate(rs.getString("license_plate"));
             t.setStationId((Integer) rs.getObject("station_id"));
-            t.setFxlx(rs.getString("fxlx"));
-            t.setHpzl(rs.getString("hpzl"));
-            t.setHphmMask(rs.getString("hphm_mask"));
-            t.setClppxh(rs.getString("clppxh"));
+            t.setSpeed((Double) rs.getObject("speed"));
             return t;
         }
     };
