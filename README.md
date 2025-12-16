@@ -153,7 +153,7 @@ server: {
 }
 ```
 
-- 浏览器打开 <http://localhost:5173，进入> Dashboard/Traffic/Alerts 页面查看图表与表格数据。
+- 浏览器打开 <http://localhost:5173>，进入 Dashboard/Traffic/Alerts 页面查看图表与表格数据。
 
 ## 3. 数据从哪里来，怎么确认“真的在动”
 
