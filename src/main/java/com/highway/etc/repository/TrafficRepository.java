@@ -19,13 +19,9 @@ public class TrafficRepository {
     }
 
     public List<TrafficRecord> query(Integer stationId, String start, String end, int page, int size) {
-        int offset = Math.max(page, 0) * Math.max(size, 1);
+        int safeSize = Math.max(size, 1);
+        int offset = Math.max(page - 1, 0) * safeSize;
         StringBuilder sql = new StringBuilder("SELECT id,gcsj,xzqhmc,adcode,kkmc,station_id,fxlx,hpzl,hphm_mask,clppxh FROM traffic_pass_dev WHERE 1=1");
-        new Object();
-        new int[0];
-        new String();
-        // build params dynamically
-        new StringBuilder();
         java.util.List<Object> params = new java.util.ArrayList<>();
         if (stationId != null) {
             sql.append(" AND station_id = ?");
@@ -40,7 +36,7 @@ public class TrafficRepository {
             params.add(end);
         }
         sql.append(" ORDER BY gcsj DESC LIMIT ? OFFSET ?");
-        params.add(size);
+        params.add(safeSize);
         params.add(offset);
         return jdbcTemplate.query(sql.toString(), params.toArray(), mapper);
     }
