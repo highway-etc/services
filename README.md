@@ -4,7 +4,7 @@
 
 本指南覆盖两部分仓库：
 
-- services：Spring Boot 后端 API（提供明细、统计、告警查询）
+- services：Spring Boot 后端 API（提供明细、统计、告警、大屏总览查询）
 - frontend：Vite + React 前端（看板/明细/告警三页）
 
 同时会用到 infra 仓库提供的本地开发环境（Kafka/Flink/MySQL/MyCat 等）。
@@ -37,6 +37,8 @@
 
 这条路径的目标是：不安装 JDK/Node，直接用 Docker 跑后端和前端。
 
+想要一步到位，可直接在 `infra/scripts` 运行 `./bluecat_oneclick.ps1`（默认构建 bluecat 镜像、启动 compose、提交 Flink 作业并拉起前后端）。
+
 1.启动本地数据基础设施（在 highway-etc/infra 目录）
 
 ```powershell
@@ -53,14 +55,14 @@ docker run --rm -it --network=infra_etcnet mysql:5.7 `
   -e "show databases; use highway_etc; show tables;"
 ```
 
-3.（可选）往 Kafka 发送一些模拟数据（在 highway-etc/infra）
-
-- 如果你已在 infra/scripts 目录添加了 send_mock_data.ps1：
+3.（推荐）批量推送 CSV 测试数据（在 highway-etc/infra/scripts）
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\send_mock_data.ps1 -N 20
+cd ..\infra\scripts
+./send_csv_batch.ps1 -Broker kafka:9092 -Topic etc_traffic
 ```
+
+脚本会用临时 python:3.11-slim 容器运行 push_kafka.py，将 `flink/data/test_data/*.csv` 全量写入 Kafka；确保 compose 已启动且 Kafka/Topic 正常。
 
 4.在 services 目录构建后端镜像并运行
 
@@ -73,7 +75,7 @@ docker run --rm -p 8080:8080 --network infra_etcnet --name etc-services etc-serv
 服务启动后将暴露 <http://localhost:8080>
 （根路径会自动跳转到 Swagger UI）。
 
-5.在 frontend 目录构建前端镜像并运行（或先用开发模式跑）
+5.在 frontend 目录构建前端镜像并运行（或先用开发模式跑，二者视觉一致）
 
 - 生产镜像（nginx 托管静态资源）：
 
@@ -125,8 +127,8 @@ curl "http://localhost:8080/api/traffic?stationId=100&start=2025-12-01T00:00:00Z
 # 窗口统计
 curl "http://localhost:8080/api/stats?stationId=100&start=2025-12-01T00:00:00Z&end=2025-12-31T23:59:59Z"
 
-# 告警
-curl "http://localhost:8080/api/alerts?plate=%E6%B5%99A12****&start=2025-12-01T00:00:00Z&end=2025-12-31T23:59:59Z"
+# 告警（支持 stationId 与车牌模糊）
+curl "http://localhost:8080/api/alerts?stationId=101&plate=%E6%B5%99A12****&start=2025-12-01T00:00:00Z&end=2025-12-31T23:59:59Z"
 ```
 
 ### 2.2 运行前端（frontend）
@@ -137,7 +139,7 @@ curl "http://localhost:8080/api/alerts?plate=%E6%B5%99A12****&start=2025-12-01T0
 cd ..\frontend
 npm install
 # 开发模式（Vite）
-npm run dev -- --host --port 5173
+npm run dev -- --host --port 3000
 ```
 
 2.配置 API 代理
@@ -147,14 +149,14 @@ npm run dev -- --host --port 5173
 ```ts
 server: {
   host: true,
-  port: 5173,
+  port: 3000,
   proxy: {
     '/api': 'http://localhost:8080'
   }
 }
 ```
 
-- 浏览器打开 <http://localhost:5173>，进入 Dashboard/Traffic/Alerts 页面查看图表与表格数据。
+- 浏览器打开 <http://localhost:3000>，进入 Dashboard/Traffic/Alerts 页面查看图表与表格数据。
 
 ## 3. 数据从哪里来，怎么确认“真的在动”
 
@@ -173,11 +175,10 @@ docker exec -it mysql mysql -uroot -prootpass -e "select count(*) c0 from etc_0.
 docker exec -it mysql mysql -uroot -prootpass -e "select station_id,window_start,window_end,cnt from etc_0.stats_realtime order by id desc limit 5; select station_id,window_start,window_end,cnt from etc_1.stats_realtime order by id desc limit 5;"
 ```
 
-- 发送测试数据（在 highway-etc/infra）
+- 发送测试数据（在 highway-etc/infra/scripts）
 
 ```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\send_mock_data.ps1 -N 200
+./send_csv_batch.ps1 -Broker kafka:9092 -Topic etc_traffic
 ```
 
 - 看到的数据
@@ -187,16 +188,21 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ## 4. API 说明（最小可用集）
 
 - GET /api/traffic
-  - 参数：stationId（可选）、start（ISO8601）、end（ISO8601）、licensePlate（可选，按 hphm_mask 模糊匹配）、page、size
+  - 参数：stationId（可选）、start（ISO8601）、end（ISO8601）、licensePlate（可选，按 hphm_mask 模糊匹配）、page（0 基）、size（1~200）
   - 返回：分页对象（total/records），records 为 traffic_pass_dev 行
 - GET /api/stats
   - 参数：stationId（可选）、start、end
   - 返回：每个时间窗口的聚合（station_id、window_start、window_end、cnt、by_dir、by_type）
 - GET /api/alerts
-  - 参数：plate（可选，脱敏或部分匹配）、start、end
+  - 参数：plate（可选，脱敏或部分匹配）、stationId（可选，first_station_id）、start、end
   - 返回：告警列表（hphm_mask、first_station_id、second_station_id、speed_kmh、confidence、created_at）
+- GET /api/overview
+  - 参数：windowMinutes（可选，默认 60，5~1440）
+  - 返回：totalTraffic、uniquePlates、alertCount、topStations（Top5）、trafficTrend（分钟级趋势）
+  - 用途：大屏看板卡片与趋势图
 
 打开 Swagger 文档交互调试：<http://localhost:8080/swagger-ui.html>
+更详细的接口字段/边界说明：见 [docs/api.md](docs/api.md)。
 
 ## 5. 常见问题排查（FAQ）
 
@@ -210,6 +216,8 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
   - A: 先看 JM/TM 日志（docker logs -n 200 flink-jobmanager/flink-taskmanager）；常见是 JDBC 连接失败或表结构不匹配。
 - Q: 如何优雅关机不丢状态
   - A: 使用 infra/scripts/savepoint_and_stop.ps1 保存点并优雅停止；下次用 resume_from_last_savepoint.ps1 恢复。
+- Q: 分页/时间查询很慢？
+  - A: 确认 etc_0 / etc_1 的 traffic_pass_dev 上有联合索引 `(station_id,gcsj)`；stats_realtime 也应有 `window_end` 索引。
 
 ## 6. 一键脚本（可选）
 
@@ -274,7 +282,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
   ```powershell
   npm install
-  npm run dev -- --host --port 5173
+  npm run dev -- --host --port 3000
   # 或
   docker build -t etc-frontend .
   docker run --rm -p 8088:80 --network infra_etcnet etc-frontend

@@ -20,9 +20,10 @@ public class AlertController {
     @GetMapping("/api/alerts")
     public List<AlertResponse> alerts(
             @RequestParam(required = false) String plate,
+            @RequestParam(required = false) Integer stationId,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end
     ) {
-        return repository.query(plate, start, end);
+        return repository.query(plate, stationId, start, end);
     }
 }

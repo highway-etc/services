@@ -14,14 +14,16 @@ import java.util.List;
 public class TrafficRepository {
 
     private final JdbcTemplate jdbcTemplate;
+    private static final int MAX_PAGE_SIZE = 200;
 
     public TrafficRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
     public TrafficPageResponse query(Integer stationId, String start, String end, String licensePlate, int page, int size) {
-        int safeSize = Math.max(size, 1);
-        int offset = Math.max(page - 1, 0) * safeSize;
+        int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+        int safePage = Math.max(page, 0);
+        int offset = Math.max(safePage - 1, 0) * safeSize;
         StringBuilder base = new StringBuilder(" FROM traffic_pass_dev WHERE 1=1");
         java.util.List<Object> params = new java.util.ArrayList<>();
         if (stationId != null) {

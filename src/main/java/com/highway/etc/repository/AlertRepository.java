@@ -18,12 +18,18 @@ public class AlertRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public List<AlertResponse> query(String plateMask, String start, String end) {
+    private static final int MAX_LIMIT = 200;
+
+    public List<AlertResponse> query(String plateMask, Integer stationId, String start, String end) {
         StringBuilder sql = new StringBuilder("SELECT hphm_mask,first_station_id,created_at FROM alert_plate_clone WHERE 1=1");
         java.util.List<Object> params = new java.util.ArrayList<>();
         if (plateMask != null && !plateMask.isBlank()) {
             sql.append(" AND hphm_mask LIKE ?");
             params.add("%" + plateMask + "%");
+        }
+        if (stationId != null) {
+            sql.append(" AND first_station_id = ?");
+            params.add(stationId);
         }
         if (start != null && !start.isBlank()) {
             sql.append(" AND created_at >= ?");
@@ -33,7 +39,7 @@ public class AlertRepository {
             sql.append(" AND created_at <= ?");
             params.add(end);
         }
-        sql.append(" ORDER BY created_at DESC LIMIT 200");
+        sql.append(" ORDER BY created_at DESC LIMIT ").append(MAX_LIMIT);
         return jdbcTemplate.query(sql.toString(), params.toArray(), mapper);
     }
 
