@@ -5,7 +5,11 @@ spring:
     url: jdbc:mysql://mycat:8066/highway_etc
     username: etcuser
     password: etcpass
-    driver-class-name: com.mysql.jdbc.Driver
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 32
+      minimum-idle: 8
+      connection-timeout: 30000
   jackson:
     default-property-inclusion: non_null
     serialization:

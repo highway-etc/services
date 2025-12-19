@@ -62,8 +62,6 @@ cd ..\infra\scripts
 ./send_csv_batch.ps1 -Broker kafka:9092 -Topic etc_traffic
 ```
 
-脚本会用临时 python:3.11-slim 容器运行 push_kafka.py，将 `flink/data/test_data/*.csv` 全量写入 Kafka；确保 compose 已启动且 Kafka/Topic 正常。
-
 4.在 services 目录构建后端镜像并运行
 
 ```powershell

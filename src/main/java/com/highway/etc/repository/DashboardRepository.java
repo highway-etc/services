@@ -18,7 +18,7 @@ public class DashboardRepository {
 
     private static final int MIN_WINDOW_MINUTES = 5;
     private static final int MAX_WINDOW_MINUTES = 24 * 60;
-    private static final int DEFAULT_WINDOW_MINUTES = 60;
+    private static final int DEFAULT_WINDOW_MINUTES = 24 * 60;
     private static final int TOP_LIMIT = 5;
 
     private final JdbcTemplate jdbcTemplate;

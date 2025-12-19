@@ -23,30 +23,35 @@ public class TrafficRepository {
     public TrafficPageResponse query(Integer stationId, String start, String end, String licensePlate, int page, int size) {
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
         int safePage = Math.max(page, 0);
-        int offset = Math.max(safePage - 1, 0) * safeSize;
-        StringBuilder base = new StringBuilder(" FROM traffic_pass_dev WHERE 1=1");
+        int offset = safePage * safeSize;
+        StringBuilder where = new StringBuilder(" WHERE 1=1");
         java.util.List<Object> params = new java.util.ArrayList<>();
         if (stationId != null) {
-            base.append(" AND station_id = ?");
+            where.append(" AND station_id = ?");
             params.add(stationId);
         }
         if (start != null && !start.isBlank()) {
-            base.append(" AND gcsj >= ?");
+            where.append(" AND gcsj >= ?");
             params.add(start);
         }
         if (end != null && !end.isBlank()) {
-            base.append(" AND gcsj <= ?");
+            where.append(" AND gcsj <= ?");
             params.add(end);
         }
         if (licensePlate != null && !licensePlate.isBlank()) {
-            base.append(" AND hphm_mask LIKE ?");
+            where.append(" AND hphm_mask LIKE ?");
             params.add("%" + licensePlate.trim() + "%");
         }
 
-        Long total = jdbcTemplate.queryForObject("SELECT COUNT(*)" + base, params.toArray(), Long.class);
+        String countSql = "SELECT COUNT(*) FROM (SELECT 1 FROM traffic_pass_dev" + where
+                + " GROUP BY gcsj,hphm_mask,station_id) t";
+        Long total = jdbcTemplate.queryForObject(countSql, params.toArray(), Long.class);
 
         StringBuilder sql = new StringBuilder(
-                "SELECT gcsj AS timestamp,hphm_mask AS license_plate,station_id,NULL AS speed" + base
+                "SELECT gcsj AS timestamp,hphm_mask AS license_plate,station_id,NULL AS speed "
+                + "FROM traffic_pass_dev"
+                + where
+                + " GROUP BY gcsj,hphm_mask,station_id"
                 + " ORDER BY gcsj DESC LIMIT ? OFFSET ?");
         params.add(safeSize);
         params.add(offset);
