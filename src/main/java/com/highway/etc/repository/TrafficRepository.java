@@ -19,7 +19,7 @@ public class TrafficRepository {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public TrafficPageResponse query(Integer stationId, String start, String end, int page, int size) {
+    public TrafficPageResponse query(Integer stationId, String start, String end, String licensePlate, int page, int size) {
         int safeSize = Math.max(size, 1);
         int offset = Math.max(page - 1, 0) * safeSize;
         StringBuilder base = new StringBuilder(" FROM traffic_pass_dev WHERE 1=1");
@@ -35,6 +35,10 @@ public class TrafficRepository {
         if (end != null && !end.isBlank()) {
             base.append(" AND gcsj <= ?");
             params.add(end);
+        }
+        if (licensePlate != null && !licensePlate.isBlank()) {
+            base.append(" AND hphm_mask LIKE ?");
+            params.add("%" + licensePlate.trim() + "%");
         }
 
         Long total = jdbcTemplate.queryForObject("SELECT COUNT(*)" + base, params.toArray(), Long.class);

@@ -59,7 +59,7 @@ docker run --rm -it --network=infra_etcnet mysql:5.7 `
 
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\scripts\send_mock_data.ps1 -N 200
+.\scripts\send_mock_data.ps1 -N 20
 ```
 
 4.在 services 目录构建后端镜像并运行
@@ -71,6 +71,7 @@ docker run --rm -p 8080:8080 --network infra_etcnet --name etc-services etc-serv
 ```
 
 服务启动后将暴露 <http://localhost:8080>
+（根路径会自动跳转到 Swagger UI）。
 
 5.在 frontend 目录构建前端镜像并运行（或先用开发模式跑）
 
@@ -186,7 +187,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ## 4. API 说明（最小可用集）
 
 - GET /api/traffic
-  - 参数：stationId（可选）、start（ISO8601）、end（ISO8601）、page、size
+  - 参数：stationId（可选）、start（ISO8601）、end（ISO8601）、licensePlate（可选，按 hphm_mask 模糊匹配）、page、size
   - 返回：分页对象（total/records），records 为 traffic_pass_dev 行
 - GET /api/stats
   - 参数：stationId（可选）、start、end
