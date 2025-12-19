@@ -29,7 +29,14 @@ public class DashboardRepository {
 
     public OverviewResponse overview(Integer windowMinutes) {
         int window = normalizeWindow(windowMinutes);
-        Timestamp since = Timestamp.valueOf(LocalDateTime.now().minusMinutes(window));
+        // MyCAT 对 MAX(timestamp) 聚合存在兼容性问题，改为按时间倒序取最新一条
+        Timestamp anchor = jdbcTemplate.queryForObject(
+                "SELECT gcsj FROM traffic_pass_dev ORDER BY gcsj DESC LIMIT 1",
+                Timestamp.class);
+        if (anchor == null) {
+            return emptyResponse();
+        }
+        Timestamp since = Timestamp.valueOf(anchor.toLocalDateTime().minusMinutes(window));
 
         Long total = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM traffic_pass_dev WHERE gcsj >= ?",
@@ -60,6 +67,16 @@ public class DashboardRepository {
         resp.setAlertCount(alerts == null ? 0 : alerts);
         resp.setTopStations(topStations);
         resp.setTrafficTrend(trend);
+        return resp;
+    }
+
+    private OverviewResponse emptyResponse() {
+        OverviewResponse resp = new OverviewResponse();
+        resp.setTotalTraffic(0);
+        resp.setUniquePlates(0L);
+        resp.setAlertCount(0);
+        resp.setTopStations(java.util.Collections.emptyList());
+        resp.setTrafficTrend(java.util.Collections.emptyList());
         return resp;
     }
 
