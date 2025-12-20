@@ -1,6 +1,7 @@
 package com.highway.etc.repository;
 
 import com.highway.etc.api.dto.OverviewResponse;
+import com.highway.etc.api.dto.ProvinceCount;
 import com.highway.etc.api.dto.TopStation;
 import com.highway.etc.api.dto.TrendPoint;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,9 +13,12 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @Repository
 public class DashboardRepository {
+    // ... (rest of the class)
 
     private static final int MIN_WINDOW_MINUTES = 5;
     private static final int MAX_WINDOW_MINUTES = 24 * 60;
@@ -61,12 +65,19 @@ public class DashboardRepository {
                 + "GROUP BY window_start ORDER BY window_start",
                 new Object[]{since}, trendMapper);
 
+        List<ProvinceCount> byProvince = jdbcTemplate.query(
+                "SELECT LEFT(hphm_mask, 1) AS prov, COUNT(*) AS cnt FROM traffic_pass_dev "
+                + "WHERE gcsj >= ? AND hphm_mask IS NOT NULL AND hphm_mask != '' "
+                + "GROUP BY prov ORDER BY cnt DESC",
+                new Object[]{since}, (rs, rowNum) -> new ProvinceCount(rs.getString("prov"), rs.getLong("cnt")));
+
         OverviewResponse resp = new OverviewResponse();
         resp.setTotalTraffic(total == null ? 0 : total);
         resp.setUniquePlates(uniquePlates);
         resp.setAlertCount(alerts == null ? 0 : alerts);
         resp.setTopStations(topStations);
         resp.setTrafficTrend(trend);
+        resp.setByProvince(byProvince);
         return resp;
     }
 

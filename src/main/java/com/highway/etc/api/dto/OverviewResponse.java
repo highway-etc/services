@@ -9,6 +9,7 @@ public class OverviewResponse {
     private long alertCount;
     private List<TopStation> topStations;
     private List<TrendPoint> trafficTrend;
+    private List<ProvinceCount> byProvince;
 
     public long getTotalTraffic() {
         return totalTraffic;
@@ -48,5 +49,13 @@ public class OverviewResponse {
 
     public void setTrafficTrend(List<TrendPoint> trafficTrend) {
         this.trafficTrend = trafficTrend;
+    }
+
+    public List<ProvinceCount> getByProvince() {
+        return byProvince;
+    }
+
+    public void setByProvince(List<ProvinceCount> byProvince) {
+        this.byProvince = byProvince;
     }
 }
