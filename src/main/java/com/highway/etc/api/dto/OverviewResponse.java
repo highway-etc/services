@@ -10,6 +10,7 @@ public class OverviewResponse {
     private List<TopStation> topStations;
     private List<TrendPoint> trafficTrend;
     private List<ProvinceCount> byProvince;
+    private List<TypeCount> byType;
 
     public long getTotalTraffic() {
         return totalTraffic;

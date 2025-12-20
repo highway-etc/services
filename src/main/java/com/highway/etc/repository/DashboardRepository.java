@@ -71,6 +71,11 @@ public class DashboardRepository {
                 + "GROUP BY prov ORDER BY cnt DESC",
                 new Object[]{since}, (rs, rowNum) -> new ProvinceCount(rs.getString("prov"), rs.getLong("cnt")));
 
+        List<com.highway.etc.api.dto.TypeCount> byType = jdbcTemplate.query(
+                "SELECT hpzl, COUNT(*) AS cnt FROM traffic_pass_dev WHERE gcsj >= ? "
+                + "GROUP BY hpzl ORDER BY cnt DESC",
+                new Object[]{since}, (rs, rowNum) -> new com.highway.etc.api.dto.TypeCount(rs.getString("hpzl"), rs.getLong("cnt")));
+
         OverviewResponse resp = new OverviewResponse();
         resp.setTotalTraffic(total == null ? 0 : total);
         resp.setUniquePlates(uniquePlates);
@@ -78,6 +83,7 @@ public class DashboardRepository {
         resp.setTopStations(topStations);
         resp.setTrafficTrend(trend);
         resp.setByProvince(byProvince);
+        resp.setByType(byType);
         return resp;
     }
 

@@ -55,11 +55,12 @@ docker run --rm -it --network=infra_etcnet mysql:5.7 `
   -e "show databases; use highway_etc; show tables;"
 ```
 
-3.（推荐）批量推送 CSV 测试数据（在 highway-etc/infra/scripts）
+3.（推荐）批量推送测试数据（在 highway-etc/infra/scripts）
 
 ```powershell
 cd ..\infra\scripts
-./send_csv_batch.ps1 -Broker kafka:9092 -Topic etc_traffic
+# 该脚本会自动调用 convert_csv.py 处理 XLSX 并使用 push_kafka.py 推送 JSON 数据
+./send_csv_batch.ps1
 ```
 
 4.在 services 目录构建后端镜像并运行

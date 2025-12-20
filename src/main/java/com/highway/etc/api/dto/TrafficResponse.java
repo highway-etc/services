@@ -7,6 +7,8 @@ public class TrafficResponse {
     private LocalDateTime timestamp;
     private String licensePlate;
     private Integer stationId;
+    private String xzqhmc;
+    private String kkmc;
     private Double speed;
 
     public LocalDateTime getTimestamp() {
@@ -28,6 +30,30 @@ public class TrafficResponse {
     public Integer getStationId() {
         return stationId;
     }
+
+    public void setStationId(Integer stationId) {
+        this.stationId = stationId;
+    }
+
+    public String getXzqhmc() {
+        return xzqhmc;
+    }
+
+    public void setXzqhmc(String xzqhmc) {
+        this.xzqhmc = xzqhmc;
+    }
+
+    public String getKkmc() {
+        return kkmc;
+    }
+
+    public void setKkmc(String kkmc) {
+        this.kkmc = kkmc;
+    }
+
+    public Double getSpeed() {
+
+    
 
     public void setStationId(Integer stationId) {
         this.stationId = stationId;

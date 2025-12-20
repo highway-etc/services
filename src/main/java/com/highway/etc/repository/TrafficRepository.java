@@ -44,14 +44,14 @@ public class TrafficRepository {
         }
 
         String countSql = "SELECT COUNT(*) FROM (SELECT 1 FROM traffic_pass_dev" + where
-                + " GROUP BY gcsj,hphm_mask,station_id) t";
+                + " GROUP BY gcsj,hphm_mask,station_id,xzqhmc,kkmc) t";
         Long total = jdbcTemplate.queryForObject(countSql, params.toArray(), Long.class);
 
         StringBuilder sql = new StringBuilder(
-                "SELECT gcsj AS timestamp,hphm_mask AS license_plate,station_id,NULL AS speed "
+                "SELECT gcsj AS timestamp,hphm_mask AS license_plate,station_id,xzqhmc,kkmc,NULL AS speed "
                 + "FROM traffic_pass_dev"
                 + where
-                + " GROUP BY gcsj,hphm_mask,station_id"
+                + " GROUP BY gcsj,hphm_mask,station_id,xzqhmc,kkmc"
                 + " ORDER BY gcsj DESC LIMIT ? OFFSET ?");
         params.add(safeSize);
         params.add(offset);
@@ -70,6 +70,8 @@ public class TrafficRepository {
             t.setTimestamp(rs.getTimestamp("timestamp").toLocalDateTime());
             t.setLicensePlate(rs.getString("license_plate"));
             t.setStationId((Integer) rs.getObject("station_id"));
+            t.setXzqhmc(rs.getString("xzqhmc"));
+            t.setKkmc(rs.getString("kkmc"));
             t.setSpeed((Double) rs.getObject("speed"));
             return t;
         }
