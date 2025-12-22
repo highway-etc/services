@@ -2,6 +2,7 @@ package com.highway.etc.repository;
 
 import com.highway.etc.api.dto.TrafficPageResponse;
 import com.highway.etc.api.dto.TrafficResponse;
+import com.highway.etc.util.VehicleTypeLabels;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -44,14 +45,14 @@ public class TrafficRepository {
         }
 
         String countSql = "SELECT COUNT(*) FROM (SELECT 1 FROM traffic_pass_dev" + where
-                + " GROUP BY gcsj,hphm_mask,station_id,xzqhmc,kkmc) t";
+                + " GROUP BY gcsj,hphm_mask,station_id,xzqhmc,kkmc,hpzl,clppxh,fxlx) t";
         Long total = jdbcTemplate.queryForObject(countSql, params.toArray(), Long.class);
 
         StringBuilder sql = new StringBuilder(
-                "SELECT gcsj AS timestamp,hphm_mask AS license_plate,station_id,xzqhmc,kkmc,NULL AS speed "
+                "SELECT gcsj AS timestamp,hphm_mask AS license_plate,station_id,xzqhmc,kkmc,hpzl,clppxh,fxlx,NULL AS speed "
                 + "FROM traffic_pass_dev"
                 + where
-                + " GROUP BY gcsj,hphm_mask,station_id,xzqhmc,kkmc"
+                + " GROUP BY gcsj,hphm_mask,station_id,xzqhmc,kkmc,hpzl,clppxh,fxlx"
                 + " ORDER BY gcsj DESC LIMIT ? OFFSET ?");
         params.add(safeSize);
         params.add(offset);
@@ -73,6 +74,11 @@ public class TrafficRepository {
             t.setXzqhmc(rs.getString("xzqhmc"));
             t.setKkmc(rs.getString("kkmc"));
             t.setSpeed((Double) rs.getObject("speed"));
+            String hpzl = rs.getString("hpzl");
+            t.setVehicleTypeCode(hpzl);
+            t.setVehicleType(VehicleTypeLabels.toName(hpzl));
+            t.setVehicleModel(rs.getString("clppxh"));
+            t.setDirection(rs.getString("fxlx"));
             return t;
         }
     };

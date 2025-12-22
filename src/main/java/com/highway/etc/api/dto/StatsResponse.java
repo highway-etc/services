@@ -10,6 +10,8 @@ public class StatsResponse {
     private Long totalCount;
     private Long uniquePlates;
     private Double avgSpeed;
+    private java.util.Map<String, Long> byDir;
+    private java.util.Map<String, Long> byType;
 
     public Integer getStationId() {
         return stationId;
@@ -57,5 +59,21 @@ public class StatsResponse {
 
     public void setAvgSpeed(Double avgSpeed) {
         this.avgSpeed = avgSpeed;
+    }
+
+    public java.util.Map<String, Long> getByDir() {
+        return byDir;
+    }
+
+    public void setByDir(java.util.Map<String, Long> byDir) {
+        this.byDir = byDir;
+    }
+
+    public java.util.Map<String, Long> getByType() {
+        return byType;
+    }
+
+    public void setByType(java.util.Map<String, Long> byType) {
+        this.byType = byType;
     }
 }

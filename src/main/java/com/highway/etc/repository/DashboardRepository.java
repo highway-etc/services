@@ -8,6 +8,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
+import com.highway.etc.util.VehicleTypeLabels;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -55,7 +57,7 @@ public class DashboardRepository {
                 new Object[]{since}, Long.class);
 
         List<TopStation> topStations = jdbcTemplate.query(
-                "SELECT station_id, COUNT(*) AS cnt FROM traffic_pass_dev WHERE gcsj >= ? "
+                "SELECT station_id, MAX(kkmc) AS kkmc, COUNT(*) AS cnt FROM traffic_pass_dev WHERE gcsj >= ? "
                 + "GROUP BY station_id ORDER BY cnt DESC LIMIT ?",
                 new Object[]{since, TOP_LIMIT}, topMapper);
 
@@ -74,7 +76,8 @@ public class DashboardRepository {
         List<com.highway.etc.api.dto.TypeCount> byType = jdbcTemplate.query(
                 "SELECT hpzl, COUNT(*) AS cnt FROM traffic_pass_dev WHERE gcsj >= ? "
                 + "GROUP BY hpzl ORDER BY cnt DESC",
-                new Object[]{since}, (rs, rowNum) -> new com.highway.etc.api.dto.TypeCount(rs.getString("hpzl"), rs.getLong("cnt")));
+                new Object[]{since}, (rs, rowNum) -> new com.highway.etc.api.dto.TypeCount(
+                        VehicleTypeLabels.toName(rs.getString("hpzl")), rs.getLong("cnt")));
 
         OverviewResponse resp = new OverviewResponse();
         resp.setTotalTraffic(total == null ? 0 : total);
@@ -94,6 +97,8 @@ public class DashboardRepository {
         resp.setAlertCount(0);
         resp.setTopStations(java.util.Collections.emptyList());
         resp.setTrafficTrend(java.util.Collections.emptyList());
+        resp.setByProvince(java.util.Collections.emptyList());
+        resp.setByType(java.util.Collections.emptyList());
         return resp;
     }
 
@@ -109,6 +114,7 @@ public class DashboardRepository {
         public TopStation mapRow(ResultSet rs, int rowNum) throws SQLException {
             TopStation t = new TopStation();
             t.setStationId((Integer) rs.getObject("station_id"));
+            t.setStationName(rs.getString("kkmc"));
             t.setCount(rs.getLong("cnt"));
             return t;
         }

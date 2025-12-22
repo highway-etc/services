@@ -19,3 +19,7 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+maintenance:
+  retention-days: 3
+  cleanup-interval-ms: 1800000 # 30 minutes

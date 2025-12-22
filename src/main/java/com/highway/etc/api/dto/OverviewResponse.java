@@ -59,4 +59,12 @@ public class OverviewResponse {
     public void setByProvince(List<ProvinceCount> byProvince) {
         this.byProvince = byProvince;
     }
+
+    public List<TypeCount> getByType() {
+        return byType;
+    }
+
+    public void setByType(List<TypeCount> byType) {
+        this.byType = byType;
+    }
 }

@@ -1,308 +1,71 @@
-# highway-etc · 后端 API 与前端从零起步指南
+﻿# services：Spring Boot 后端 API 说明书
 
-这是一份给新用户的“超详细、可直接照抄”的上手手册。目标是在你的电脑上把整套系统（后端 API + 前端看板）跑起来，并且能看到实时写入数据库的数据。
+提供明细查询、窗口统计、套牌告警、大屏总览等 REST API，默认对接 infra 提供的 MyCat 分库分表数据库。本文档面向新手，按最少步骤跑通 + 常见问题排查组织。
 
-本指南覆盖两部分仓库：
+## 技术栈与依赖
 
-- services：Spring Boot 后端 API（提供明细、统计、告警、大屏总览查询）
-- frontend：Vite + React 前端（看板/明细/告警三页）
+- Spring Boot 3 + Spring Web + Spring Data
+- MySQL Connector 5.1.49（兼容 MyCat 1.x）
+- Swagger（springdoc-openapi），默认 <http://localhost:8080/swagger-ui.html>
+- 数据源：jdbc:mysql://mycat:8066/highway_etc（账号 etcuser/etcpass，见 application.yml）
 
-同时会用到 infra 仓库提供的本地开发环境（Kafka/Flink/MySQL/MyCat 等）。
+## 目录速览
 
-## 0. 你需要准备什么
+- src/main/java/com/highway/etc/api：控制器（Traffic/Stats/Alerts/Overview）
+- src/main/resources/application.yml：数据源与 Swagger 配置
+- Dockerfile：多阶段构建，产出轻量镜像
 
-- 必备软件
-  - Docker Desktop（Windows/macOS/Linux 均可）
-  - Git
-  -（可选，本地运行后端）JDK 17（Temurin/OpenJDK 均可）
-  -（可选，本地运行前端）Node.js 18+ 与 npm / pnpm / yarn 任一
-  -（可选，连接 MyCat）MySQL 5.7 客户端（MyCat 1.x 与 MySQL 8 客户端握手不兼容，建议用 5.7 客户端）
+## 快速跑通（最简 3 步）
 
-- 仓库（建议与本指南一致的相对位置）
-
-  ```text
-  highway-etc/
-  ├─ infra/        # 本地开发环境：Kafka/Flink/MySQL/MyCat/…（docker-compose）
-  ├─ streaming/    # Flink 实时作业
-  ├─ services/     # 你当前所在仓库：后端 API
-  └─ frontend/     # 前端看板（Vite + React）
-  ```
-
-- 端口约定
-  - MyCat：8066（逻辑库 highway_etc）
-  - Services 后端：8080
-  - Frontend（开发模式）：5173（或 5174），生产 nginx 容器默认 8088
-
-## 1. 一分钟快速体验（推荐先跑通）
-
-这条路径的目标是：不安装 JDK/Node，直接用 Docker 跑后端和前端。
-
-想要一步到位，可直接在 `infra/scripts` 运行 `./bluecat_oneclick.ps1`（默认构建 bluecat 镜像、启动 compose、提交 Flink 作业并拉起前后端）。
-
-1.启动本地数据基础设施（在 highway-etc/infra 目录）
+1) 启动基础设施：在 infra 目录执行 `docker compose -f docker-compose.dev.yml up -d`。
+2) 打包运行（本机有 JDK17）：
 
 ```powershell
-docker compose -f docker-compose.dev.yml up -d
-```
-
-确认容器均为 Up，且 Flink Web UI 可访问（端口可能是 8081 或你自定义的端口）。
-
-2.验证 MyCat 正常提供逻辑库（MySQL 5.7 客户端）
-
-```powershell
-docker run --rm -it --network=infra_etcnet mysql:5.7 `
-  mysql -hmycat -P8066 -uetcuser -petcpass `
-  -e "show databases; use highway_etc; show tables;"
-```
-
-3.（推荐）批量推送测试数据（在 highway-etc/infra/scripts）
-
-```powershell
-cd ..\infra\scripts
-# 该脚本会自动调用 convert_csv.py 处理 XLSX 并使用 push_kafka.py 推送 JSON 数据
-./send_csv_batch.ps1
-```
-
-4.在 services 目录构建后端镜像并运行
-
-```powershell
-cd ..\services
-docker build -t etc-services .
-docker run --rm -p 8080:8080 --network infra_etcnet --name etc-services etc-services
-```
-
-服务启动后将暴露 <http://localhost:8080>
-（根路径会自动跳转到 Swagger UI）。
-
-5.在 frontend 目录构建前端镜像并运行（或先用开发模式跑，二者视觉一致）
-
-- 生产镜像（nginx 托管静态资源）：
-
-```powershell
-cd ..\frontend
-docker build -t etc-frontend .
-docker run --rm -p 8088:80 --network infra_etcnet --name etc-frontend etc-frontend
-```
-
-打开 <http://localhost:8088> 即可访问看板。
-
-- 开发模式（热更新，需 Node 环境）见“本地开发模式”一节。
-
-## 2. 本地开发模式（后端/前端分别热更新）
-
-适合日常开发调试，前端通过代理把 /api 转发给本地后端。
-
-### 2.1 运行后端（services）
-
-1.配置数据库连接（默认已内置 MyCat 连接）
-
-- 应用使用 MyCat 逻辑库 highway_etc，地址为 jdbc:mysql://mycat:8066/highway_etc
-- 账号：etcuser / 密码：etcpass
-- 注意：运行容器时需要加入 infra_etcnet 网络才能解析 mycat 主机名（见下）
-
-2.本地构建与运行（需要 JDK 17）
-
-```powershell
-cd services
 mvn -B -DskipTests package
 java -jar target/services-0.1.0.jar
 ```
 
-- 访问 Swagger UI: <http://localhost:8080/swagger-ui.html>
-
-3.用 Docker 运行（无需 JDK）
+或容器运行（无需 JDK）：
 
 ```powershell
 docker build -t etc-services .
 docker run --rm -p 8080:8080 --network infra_etcnet etc-services
 ```
 
-4.验证 API（示例）
+3) 打开 <http://localhost:8080/swagger-ui.html> 验证接口可用。
 
-```powershell
-# 明细（分页）
-curl "http://localhost:8080/api/traffic?stationId=100&start=2025-12-01T00:00:00Z&end=2025-12-31T23:59:59Z&page=1&size=20"
+## API 摘要
 
-# 窗口统计
-curl "http://localhost:8080/api/stats?stationId=100&start=2025-12-01T00:00:00Z&end=2025-12-31T23:59:59Z"
+- GET /api/traffic：分页明细，参数 stationId、start、end、licensePlate、page（0 基）、size。
+- GET /api/stats：窗口聚合，参数 stationId、start、end。
+- GET /api/alerts：套牌告警，参数 plate、stationId、start、end。
+- GET /api/overview：大屏总览，参数 windowMinutes（默认 60，范围 5~1440）。
+返回字段详见 docs/api.md 或 Swagger。
 
-# 告警（支持 stationId 与车牌模糊）
-curl "http://localhost:8080/api/alerts?stationId=101&plate=%E6%B5%99A12****&start=2025-12-01T00:00:00Z&end=2025-12-31T23:59:59Z"
-```
+## 与实时链路的关系
 
-### 2.2 运行前端（frontend）
+- 数据源来自 streaming 作业写入的 traffic_pass_dev（明细）、stats_realtime（30s 窗口）、alert（套牌告警）。
+- MyCat 按 station_id 分片：偶数 -> etc_0，奇数 -> etc_1。请确保 infra 中的 MyCat 配置已加载。
 
-1.安装依赖并启动开发服务器
+## 本地调试贴士
 
-```powershell
-cd ..\frontend
-npm install
-# 开发模式（Vite）
-npm run dev -- --host --port 3000
-```
+- 代理网络：容器运行时务必附加 `--network infra_etcnet`，否则无法解析 mycat/kafka。
+- SQL 性能：确认 traffic_pass_dev 上有 `(station_id,gcsj)` 联合索引，stats_realtime 有 `window_end` 索引。
+- 时间格式：start/end 传 ISO8601 或 `yyyy-MM-dd HH:mm:ss`，内部按字符串传给仓储层解析。
 
-2.配置 API 代理
+## 常见问题
 
-- 在 frontend/vite.config.ts（或 vite.config.js）增加：
+- 通过 MyCat 连接被拒：请使用 MySQL 5.7 客户端；检查账号密码等于 etcuser/etcpass；确认 MyCat 容器已重启加载配置。
+- 接口总是 0 行：检查 streaming 是否在写库；用 `select count(*) from etc_0.traffic_pass_dev` / etc_1 验证；再查 stats_realtime 是否有新窗口。
+- 容器内连不上 mycat：确保 --network infra_etcnet；或临时把数据源改为宿主机 IP（不推荐）。
 
-```ts
-server: {
-  host: true,
-  port: 3000,
-  proxy: {
-    '/api': 'http://localhost:8080'
-  }
-}
-```
+## 构建与部署
 
-- 浏览器打开 <http://localhost:3000>，进入 Dashboard/Traffic/Alerts 页面查看图表与表格数据。
+- 本地：`mvn -B -DskipTests package && java -jar target/services-0.1.0.jar`
+- 镜像：`docker build -t etc-services .` 后 `docker run --rm -p 8080:8080 --network infra_etcnet etc-services`
 
-## 3. 数据从哪里来，怎么确认“真的在动”
+## 验收清单
 
-- 实时链路：Kafka → Flink → MyCat（分库分表）
-  - Kafka 主题：etc_traffic（6 分区）
-  - Flink 作业：TrafficStreamingJob（明细+30s 统计）、PlateCloneDetectionJob（套牌告警）
-  - MyCat 路由：按 station_id 取模 2 → etc_0（偶数）、etc_1（奇数）
-
-- 快速自检命令（在 highway-etc/infra）
-
-```powershell
-# 统计两分片的明细条数
-docker exec -it mysql mysql -uroot -prootpass -e "select count(*) c0 from etc_0.traffic_pass_dev; select count(*) c1 from etc_1.traffic_pass_dev;"
-
-# 查最近窗口统计（各分片）
-docker exec -it mysql mysql -uroot -prootpass -e "select station_id,window_start,window_end,cnt from etc_0.stats_realtime order by id desc limit 5; select station_id,window_start,window_end,cnt from etc_1.stats_realtime order by id desc limit 5;"
-```
-
-- 发送测试数据（在 highway-etc/infra/scripts）
-
-```powershell
-./send_csv_batch.ps1 -Broker kafka:9092 -Topic etc_traffic
-```
-
-- 看到的数据
-  - 后端：/api/stats 折线与饼图会动；/api/traffic 明细分页可查
-  - 数据库：etc_0/ etc_1 的 traffic_pass_dev 有新增；stats_realtime 每 30s 有新窗口
-
-## 4. API 说明（最小可用集）
-
-- GET /api/traffic
-  - 参数：stationId（可选）、start（ISO8601）、end（ISO8601）、licensePlate（可选，按 hphm_mask 模糊匹配）、page（0 基）、size（1~200）
-  - 返回：分页对象（total/records），records 为 traffic_pass_dev 行
-- GET /api/stats
-  - 参数：stationId（可选）、start、end
-  - 返回：每个时间窗口的聚合（station_id、window_start、window_end、cnt、by_dir、by_type）
-- GET /api/alerts
-  - 参数：plate（可选，脱敏或部分匹配）、stationId（可选，first_station_id）、start、end
-  - 返回：告警列表（hphm_mask、first_station_id、second_station_id、speed_kmh、confidence、created_at）
-- GET /api/overview
-  - 参数：windowMinutes（可选，默认 60，5~1440）
-  - 返回：totalTraffic、uniquePlates、alertCount、topStations（Top5）、trafficTrend（分钟级趋势）
-  - 用途：大屏看板卡片与趋势图
-
-打开 Swagger 文档交互调试：<http://localhost:8080/swagger-ui.html>
-更详细的接口字段/边界说明：见 [docs/api.md](docs/api.md)。
-
-## 5. 常见问题排查（FAQ）
-
-- Q: 通过 MyCat 连接失败（Access denied / 握手失败）
-  - A: 确认使用 MySQL 5.7 客户端连接 MyCat 1.x；账号 etcuser / 等于 etcpass；容器挂载的 server.xml/schema.xml/rule.xml 已生效（重启过 mycat）。
-- Q: 后端容器连不上 mycat 主机名
-  - A: 启动容器时加 `--network infra_etcnet`；或在 application 配置中改用宿主机 IP（不推荐）。
-- Q: 前端跨域失败（CORS）
-  - A: 开发模式使用 Vite 代理 `/api` → `http://localhost:8080`；生产镜像直接走同源（nginx 与后端端口不同域时请在 nginx 做反向代理）。
-- Q: Flink Job 重启/失败
-  - A: 先看 JM/TM 日志（docker logs -n 200 flink-jobmanager/flink-taskmanager）；常见是 JDBC 连接失败或表结构不匹配。
-- Q: 如何优雅关机不丢状态
-  - A: 使用 infra/scripts/savepoint_and_stop.ps1 保存点并优雅停止；下次用 resume_from_last_savepoint.ps1 恢复。
-- Q: 分页/时间查询很慢？
-  - A: 确认 etc_0 / etc_1 的 traffic_pass_dev 上有联合索引 `(station_id,gcsj)`；stats_realtime 也应有 `window_end` 索引。
-
-## 6. 一键脚本（可选）
-
-在 highway-etc/infra/scripts 下已经提供了 Windows PowerShell 版本脚本：
-
-- savepoint_and_stop.ps1：为所有运行中的 Flink 作业创建 savepoint 并优雅停止
-- resume_from_last_savepoint.ps1：从最新 savepoint 恢复 TrafficStreamingJob / PlateCloneDetectionJob
-- send_mock_data.ps1：向 Kafka 的 etc_traffic 主题推送 N 条标准 JSON
-
-先允许当前会话执行脚本：
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-示例：
-
-```powershell
-# 保存点并停止
-..\infra\scripts\savepoint_and_stop.ps1
-
-# 从保存点恢复
-..\infra\scripts\resume_from_last_savepoint.ps1
-
-# 发送 500 条测试数据
-..\infra\scripts\send_mock_data.ps1 -N 500
-```
-
-## 7. 目录结构与构建
-
-- services（后端）
-
-  ```text
-  services/
-  ├─ src/main/java/...        # 控制器/服务/DAO
-  ├─ src/main/resources/      # 配置
-  ├─ Dockerfile               # 多阶段构建
-  └─ pom.xml
-  ```
-
-  构建/运行：
-
-  ```powershell
-  mvn -B -DskipTests package
-  java -jar target/services-0.1.0.jar
-  # 或
-  docker build -t etc-services .
-  docker run --rm -p 8080:8080 --network infra_etcnet etc-services
-  ```
-
-- frontend（前端）
-
-  ```text
-  frontend/
-  ├─ src/                     # 页面/组件
-  ├─ vite.config.ts
-  ├─ Dockerfile               # nginx 托管静态资源
-  └─ package.json
-  ```
-
-  开发/运行：
-
-  ```powershell
-  npm install
-  npm run dev -- --host --port 3000
-  # 或
-  docker build -t etc-frontend .
-  docker run --rm -p 8088:80 --network infra_etcnet etc-frontend
-  ```
-
-## 8. 验收清单（你可以用这几条确认“OK 可演示”）
-
-- [ ] <http://localhost:8080/swagger-ui.html> 可打开，三条 API 均可返回数据
-- [ ] 前端看板页（Dashboard）能展示折线与饼图，数值随数据变化
-- [ ] 明细页（Traffic）分页可用，可按站点/时间过滤
-- [ ] 告警页（Alerts）能看到列表与详情（有回放同车牌数据时）
-- [ ] MyCat 分库分表生效：偶数 station_id 在 etc_0，奇数在 etc_1
-- [ ] 关机前能执行 savepoint_and_stop.ps1；开机后能 resume_from_last_savepoint.ps1 成功恢复
-
-## 9. 进一步的建议（之后再做）
-
-- 接入 Prometheus + Grafana，导入 Flink/Kafka/MySQL Dashboard，做系统可观测性
-- 前端添加大屏模式（ECharts 全屏轮播）
-- Services 接入 ClickHouse/Trino（OLAP）以支撑大时间范围统计
-- batch-ml：离线 ETL（raw/clean/feature）与简单模型的训练/评估
-
----
-
-有任何一步卡住，带上你执行的命令和控制台输出发 Issue，我们会根据日志帮你快速定位。
+- Swagger 可访问，/api/traffic、/api/stats、/api/alerts、/api/overview 均能返回数据。
+- MyCat 分片生效（偶数在 etc_0，奇数在 etc_1）。
+- 前端（或 curl）访问 /api/overview 时返回非零指标。
